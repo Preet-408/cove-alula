@@ -51,10 +51,16 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         return
 
     def _ensure_writable(coord) -> None:
-        """Read-only mode means no commands to the panel at all, not just no arm/disarm."""
-        if get_setting(coord.entry, CONF_PIN_MODE, PIN_MODE_STORED) == PIN_MODE_READONLY:
+        """Panel-command services need a stored PIN. In read-only and ask-each-time modes
+        they are refused outright (several of them, e.g. native force_arm, cancel_alarm and
+        bypass_zone, would otherwise act without any PIN). Arming and disarming from the
+        alarm panel entity still work in ask-each-time mode, with the PIN typed in."""
+        mode = get_setting(coord.entry, CONF_PIN_MODE, PIN_MODE_STORED)
+        if mode != PIN_MODE_STORED:
+            label = "read-only" if mode == PIN_MODE_READONLY else "ask-for-PIN"
             raise HomeAssistantError(
-                "Cove (Alula) is configured read-only; panel commands are disabled."
+                f"Cove (Alula) is in {label} mode; panel command services are disabled. "
+                "Use the alarm panel entity to arm or disarm."
             )
 
     async def _for_each_panel(handler) -> None:

@@ -27,6 +27,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Optional
 
+from .scrub import capture_zone_entries
+
 import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
@@ -358,6 +360,9 @@ class CoveAlulaClient:
     ) -> None:
         self._session = session
         self._own_session = session is None
+        # Raw per-zone configuration/options as the panel sends them (names stripped), kept
+        # for diagnostics so unmapped fields (e.g. the real sensor type) can be identified.
+        self.raw_zone_config: dict[str, dict[str, Any]] = {}
         self._token = token or CoveToken()
         self._token_updated = token_updated
         self._update_callback = update_callback
@@ -883,6 +888,12 @@ class CoveAlulaClient:
             elif isinstance(value, str):
                 zattrs["name"] = value
 
+    def _keep_raw_zone_config(self, nm: str, data: Any) -> None:
+        """Store scrubbed zone config entries by index for diagnostics."""
+        self.raw_zone_config.setdefault(nm, {}).update(
+            capture_zone_entries(data, self._ZONE_INDEX_KEYS)
+        )
+
     def _extract_mfd_entry(self, entry: dict, attrs: dict, zones: dict) -> None:
         """Handle one payload entry {"name": <field>, "value"/"items": ...}."""
         nm = entry.get("name")
@@ -892,6 +903,8 @@ class CoveAlulaClient:
             items = val
 
         if nm in self._ZONE_MFD_NAMES:
+            if nm in ("zoneConfiguration", "zoneConfigurations", "zoneOptions"):
+                self._keep_raw_zone_config(nm, items if items is not None else val)
             self._collect_zones(items if items is not None else val, zones)
             return
         if nm == "panelName":
