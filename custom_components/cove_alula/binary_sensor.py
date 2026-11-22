@@ -23,7 +23,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .covealula import PanelState, Zone
-from .zone_class import exact_class, name_is_cold
+from .zone_class import alarm_class, exact_class, name_is_cold
 from .coordinator import CoveAlulaCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,10 +36,12 @@ def _zone_device_class(zone: Zone) -> BinarySensorDeviceClass:
     ui = (zone.ui_type or "").strip().lower()
     name = (zone.name or "").lower()
 
-    # 0) exact Cove ui_type (the types the Cove app itself uses)
-    exact = exact_class(zone.ui_type)
-    if exact:
-        return BinarySensorDeviceClass(exact)
+    # 0) what the panel says the zone is: configured alarm type, then device type,
+    #    then the app's ui_type (all exact matches)
+    for found in (alarm_class(zone.alarm_type), exact_class(zone.device_type),
+                  exact_class(zone.ui_type)):
+        if found:
+            return BinarySensorDeviceClass(found)
 
     # 1) exact-ish uiType classification
     if ui:
@@ -257,6 +259,10 @@ class CoveAlulaSystemSensor(_BasePanelEntity):
             return p.ready
         val = getattr(p, self._attr, None)
         if val is None:
+            # Cove only sends "alarm" when something is happening. Once the panel has
+            # reported a real arming state, a missing alarm flag means no alarm.
+            if self._attr == "alarm" and p.arming_level not in (None, 0):
+                return False
             return None
         return bool(val)
 
