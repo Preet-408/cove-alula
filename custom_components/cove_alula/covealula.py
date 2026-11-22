@@ -27,6 +27,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Optional
 
+from .scrub import scrub
+
 import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
@@ -886,23 +888,6 @@ class CoveAlulaClient:
             elif isinstance(value, str):
                 zattrs["name"] = value
 
-    @staticmethod
-    def _scrub(obj: Any, depth: int = 0) -> Any:
-        """Copy of obj without names, PINs/codes or user identifiers (recursive)."""
-        if depth > 6:
-            return None
-        if isinstance(obj, dict):
-            out = {}
-            for k, v in obj.items():
-                kl = str(k).lower()
-                if any(w in kl for w in ("name", "pin", "code", "user", "email", "phone")):
-                    continue
-                out[k] = CoveAlulaClient._scrub(v, depth + 1)
-            return out
-        if isinstance(obj, list):
-            return [CoveAlulaClient._scrub(v, depth + 1) for v in obj[:128]]
-        return obj if isinstance(obj, (int, float, bool)) or obj is None else str(obj)[:40]
-
     def _keep_raw_zone_config(self, nm: str, data: Any) -> None:
         """Store zone config entries by index for diagnostics, scrubbed of names/PINs."""
         if isinstance(data, dict):
@@ -918,7 +903,7 @@ class CoveAlulaClient:
             idx = next((entry[k] for k in self._ZONE_INDEX_KEYS if k in entry), key)
             value = entry.get("value", entry)
             if isinstance(value, dict):
-                bucket[str(idx)] = self._scrub(value)
+                bucket[str(idx)] = scrub(value) or {}
 
     def _extract_mfd_entry(self, entry: dict, attrs: dict, zones: dict) -> None:
         """Handle one payload entry {"name": <field>, "value"/"items": ...}."""
