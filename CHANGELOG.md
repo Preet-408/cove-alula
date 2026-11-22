@@ -8,6 +8,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). T
 kept in sync with the headings below — HACS installs the latest GitHub release and shows
 its notes, so each release's section is what users read before updating.
 
+## [1.5.0] - 2026-11-21 (Preet-408 fork)
+### Fixed
+- Zone types now come from the panel's own zone configuration: `alarmType` (Water Level → moisture, Low Temperature → cold, ...) and `deviceType` (PIR → motion, Glass Break → sound). zoneStatus's numeric `deviceType` (0) no longer overwrites the real type string. Names are only a fallback.
+- Disabled zone slots (`zoneSourceEnum: disabled`) no longer create sensors.
+- The panel "Alarm" sensor reads Off instead of Unknown once the panel has reported an arming state and no alarm.
+
 ## [1.4.2] - 2026-11-21 (Preet-408 fork)
 ### Changed
 - Panel-command services (`arm`, `disarm`, `force_arm`, `cancel_alarm`, `confirm_alarm`, `bypass_zone`) now also refuse in ask-for-PIN mode, not only read-only. Arming and disarming from the alarm panel entity with a typed PIN still works.

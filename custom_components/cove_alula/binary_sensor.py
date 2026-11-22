@@ -23,7 +23,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .covealula import PanelState, Zone
-from .zone_class import exact_class, name_is_cold
+from .zone_class import alarm_class, exact_class, name_is_cold
 from .coordinator import CoveAlulaCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,10 +36,12 @@ def _zone_device_class(zone: Zone) -> BinarySensorDeviceClass:
     ui = (zone.ui_type or "").strip().lower()
     name = (zone.name or "").lower()
 
-    # 0) exact Cove ui_type (the types the Cove app itself uses)
-    exact = exact_class(zone.ui_type)
-    if exact:
-        return BinarySensorDeviceClass(exact)
+    # 0) what the panel says the zone is: configured alarm type, then device type,
+    #    then the app's ui_type (all exact matches)
+    for found in (alarm_class(zone.alarm_type), exact_class(zone.device_type),
+                  exact_class(zone.ui_type)):
+        if found:
+            return BinarySensorDeviceClass(found)
 
     # 1) exact-ish uiType classification
     if ui:
@@ -117,6 +119,9 @@ async def async_setup_entry(
                 # skip zones the panel reports as not installed / inactive
                 if zone.installed is False or zone.inactive is True:
                     continue
+                # unused slot per the panel's zone configuration
+                if (zone.zone_source or "").lower() == "disabled":
+                    continue
                 key = (device_id, idx)
                 if key in known_zones:
                     continue
@@ -191,6 +196,13 @@ class CoveAlulaZoneSensor(_BasePanelEntity):
         self._attr_unique_id = f"{entry.entry_id}_{device_id}_zone_{index}"
 
     @property
+    def available(self) -> bool:
+        z = self._zone
+        if z is not None and (z.zone_source or "").lower() == "disabled":
+            return False
+        return super().available
+
+    @property
     def _zone(self) -> Zone | None:
         p = self._panel
         return p.zones.get(self._index) if p else None
@@ -257,6 +269,10 @@ class CoveAlulaSystemSensor(_BasePanelEntity):
             return p.ready
         val = getattr(p, self._attr, None)
         if val is None:
+            # Cove only sends "alarm" when something is happening. Once the panel has
+            # reported a real arming state, a missing alarm flag means no alarm.
+            if self._attr == "alarm" and p.arming_level not in (None, 0):
+                return False
             return None
         return bool(val)
 

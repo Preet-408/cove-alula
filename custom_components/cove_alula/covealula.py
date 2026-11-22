@@ -175,6 +175,8 @@ class Zone:
     signal_level: Optional[int] = None
     device_type: Optional[str] = None   # e.g. "door", "window", "motion", "smoke"
     ui_type: Optional[str] = None       # UI hint the app uses to pick an icon/class
+    alarm_type: Optional[str] = None    # zoneConfiguration alarmType, e.g. "Water Level"
+    zone_source: Optional[str] = None   # zoneConfiguration zoneSourceEnum; "disabled" = unused slot
     raw: dict = field(default_factory=dict)
 
     def apply(self, attrs: dict) -> None:
@@ -190,9 +192,15 @@ class Zone:
                 self.signal_level = int(attrs["signal_level"])
             except (TypeError, ValueError):
                 pass
-        for src in ("device_type", "ui_type"):
-            if src in attrs and attrs[src] not in (None, ""):
-                setattr(self, src, attrs[src])
+        # Only non-empty strings: zoneStatus carries a numeric deviceType (0) that must not
+        # overwrite the real type string from zoneConfiguration ("DWS", "PIR", ...).
+        for src in ("device_type", "ui_type", "alarm_type", "zone_source"):
+            v = attrs.get(src)
+            if isinstance(v, str) and v.strip():
+                setattr(self, src, v.strip())
+
+
+_TYPE_FIELDS = frozenset({"device_type", "ui_type", "alarm_type", "zone_source"})
 
 
 @dataclass
@@ -270,6 +278,8 @@ class PanelState:
         for idx, z in self.zones.items():
             if self.highest_zone_index is not None and idx > self.highest_zone_index:
                 continue
+            if (z.zone_source or "").lower() == "disabled":
+                continue  # unused slot on the panel
             out.append(z)
         return out
 
@@ -806,6 +816,8 @@ class CoveAlulaClient:
         "device_type": "device_type", "deviceType": "device_type",
         "ui_type": "ui_type", "uiType": "ui_type",
         "ui_type_user": "ui_type", "uiTypeUser": "ui_type",
+        "alarmType": "alarm_type", "alarm_type": "alarm_type",
+        "zoneSourceEnum": "zone_source",
     }
     _ZONE_INDEX_KEYS = ("zoneIndex", "zone_index", "index", "zoneNumber", "_id")
 
@@ -881,6 +893,11 @@ class CoveAlulaClient:
                 for k, v in value.items():
                     dst = self._ZONE_ALIASES.get(k)
                     if dst and not isinstance(v, (dict, list)):
+                        # Type fields: only non-empty strings, so zoneStatus's numeric
+                        # deviceType (0) can't replace "PIR" from zoneConfiguration in
+                        # either order within one message.
+                        if dst in _TYPE_FIELDS and not (isinstance(v, str) and v.strip()):
+                            continue
                         zattrs[dst] = v
                 # zone-name reads: a {"name": "..."} label
                 if "name" not in zattrs and isinstance(value.get("name"), str):

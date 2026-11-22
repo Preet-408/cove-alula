@@ -30,6 +30,25 @@ _EXACT: dict[str, str] = {
     "tamper": "tamper",
     "gate": "opening",
     "safe": "opening",
+    "pir": "motion",
+}
+
+# zoneConfiguration alarmType -> device class (environmental zones; "Intrusion" says
+# nothing about the sensor, so it falls through to deviceType / name).
+_ALARM: dict[str, str] = {
+    "water level": "moisture",
+    "water": "moisture",
+    "flood": "moisture",
+    "low temperature": "cold",
+    "freeze": "cold",
+    "high temperature": "heat",
+    "fire": "smoke",
+    "smoke": "smoke",
+    "carbon monoxide": "carbon_monoxide",
+    "co": "carbon_monoxide",
+    "gas": "gas",
+    "panic": "safety",
+    "medical": "safety",
 }
 
 
@@ -41,6 +60,11 @@ def normalize(ui_type: str | None) -> str:
 def exact_class(ui_type: str | None) -> str | None:
     """Device class for a known Cove ui_type, or None to fall back to heuristics."""
     return _EXACT.get(normalize(ui_type))
+
+
+def alarm_class(alarm_type: str | None) -> str | None:
+    """Device class from the zone's configured alarm type, or None."""
+    return _ALARM.get(normalize(alarm_type))
 
 
 def name_is_cold(name: str | None) -> bool:

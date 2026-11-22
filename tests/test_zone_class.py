@@ -46,3 +46,19 @@ def test_device_classes_are_real_ha_values():
         "smoke", "sound", "tamper", "update", "vibration", "window",
     }
     assert set(zc._EXACT.values()) <= ha_values
+
+
+def test_alarm_type_from_panel_configuration():
+    assert zc.alarm_class("Water Level") == "moisture"
+    assert zc.alarm_class("Low Temperature") == "cold"
+    assert zc.alarm_class("High Temperature") == "heat"
+    assert zc.alarm_class("Intrusion") is None  # says nothing about the sensor type
+    assert zc.alarm_class("No Alarm") is None
+    assert zc.alarm_class(None) is None
+
+
+def test_panel_device_types():
+    assert zc.exact_class("PIR") == "motion"
+    assert zc.exact_class("Glass Break") == "sound"
+    assert zc.exact_class("DWS") is None  # door/window: refined by name
+    assert zc.exact_class("Home Disaster") is None  # decided by alarm type instead
