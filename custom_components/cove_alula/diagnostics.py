@@ -160,6 +160,7 @@ async def async_get_config_entry_diagnostics(
     coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if coordinator is not None:
         data["panels"] = [_panel_dict(ps) for ps in coordinator.client.panels.values()]
+        data["zone_configuration_raw"] = dict(getattr(coordinator.client, "raw_zone_config", {}))
     return data
 
 

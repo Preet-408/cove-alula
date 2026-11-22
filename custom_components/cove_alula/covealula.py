@@ -358,6 +358,9 @@ class CoveAlulaClient:
     ) -> None:
         self._session = session
         self._own_session = session is None
+        # Raw per-zone configuration/options as the panel sends them (names stripped), kept
+        # for diagnostics so unmapped fields (e.g. the real sensor type) can be identified.
+        self.raw_zone_config: dict[str, dict[str, Any]] = {}
         self._token = token or CoveToken()
         self._token_updated = token_updated
         self._update_callback = update_callback
@@ -883,6 +886,18 @@ class CoveAlulaClient:
             elif isinstance(value, str):
                 zattrs["name"] = value
 
+    def _keep_raw_zone_config(self, nm: str, data: Any) -> None:
+        """Store zone config entries by index for diagnostics, without zone names."""
+        pairs = data.items() if isinstance(data, dict) else enumerate(data or [])
+        bucket = self.raw_zone_config.setdefault(nm, {})
+        for key, entry in list(pairs)[:128]:
+            if not isinstance(entry, dict):
+                continue
+            idx = next((entry[k] for k in self._ZONE_INDEX_KEYS if k in entry), key)
+            value = entry.get("value", entry)
+            if isinstance(value, dict):
+                bucket[str(idx)] = {k: v for k, v in value.items() if "name" not in k.lower()}
+
     def _extract_mfd_entry(self, entry: dict, attrs: dict, zones: dict) -> None:
         """Handle one payload entry {"name": <field>, "value"/"items": ...}."""
         nm = entry.get("name")
@@ -892,6 +907,8 @@ class CoveAlulaClient:
             items = val
 
         if nm in self._ZONE_MFD_NAMES:
+            if nm in ("zoneConfiguration", "zoneConfigurations", "zoneOptions"):
+                self._keep_raw_zone_config(nm, items if items is not None else val)
             self._collect_zones(items if items is not None else val, zones)
             return
         if nm == "panelName":

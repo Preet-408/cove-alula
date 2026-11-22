@@ -8,6 +8,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). T
 kept in sync with the headings below — HACS installs the latest GitHub release and shows
 its notes, so each release's section is what users read before updating.
 
+## [1.4.2] - 2026-11-21 (Preet-408 fork)
+### Changed
+- Panel-command services (`arm`, `disarm`, `force_arm`, `cancel_alarm`, `confirm_alarm`, `bypass_zone`) now also refuse in ask-for-PIN mode, not only read-only. Arming and disarming from the alarm panel entity with a typed PIN still works.
+### Added
+- Diagnostics include the raw per-zone configuration the panel sends (`zone_configuration_raw`, zone names stripped), to identify the real sensor-type field.
+
 ## [1.4.1] - 2026-11-21 (Preet-408 fork)
 ### Fixed
 - Read-only mode now blocks every panel command. The `force_arm` (native), `cancel_alarm`, `confirm_alarm` and `bypass_zone` services previously still ran without a PIN in read-only mode; all six services now refuse before anything is sent.
