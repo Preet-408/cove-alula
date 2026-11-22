@@ -200,6 +200,9 @@ class Zone:
                 setattr(self, src, v.strip())
 
 
+_TYPE_FIELDS = frozenset({"device_type", "ui_type", "alarm_type", "zone_source"})
+
+
 @dataclass
 class PanelState:
     """Live panel state assembled from REST + WebSocket pushes."""
@@ -890,6 +893,11 @@ class CoveAlulaClient:
                 for k, v in value.items():
                     dst = self._ZONE_ALIASES.get(k)
                     if dst and not isinstance(v, (dict, list)):
+                        # Type fields: only non-empty strings, so zoneStatus's numeric
+                        # deviceType (0) can't replace "PIR" from zoneConfiguration in
+                        # either order within one message.
+                        if dst in _TYPE_FIELDS and not (isinstance(v, str) and v.strip()):
+                            continue
                         zattrs[dst] = v
                 # zone-name reads: a {"name": "..."} label
                 if "name" not in zattrs and isinstance(value.get("name"), str):

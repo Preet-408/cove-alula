@@ -119,6 +119,9 @@ async def async_setup_entry(
                 # skip zones the panel reports as not installed / inactive
                 if zone.installed is False or zone.inactive is True:
                     continue
+                # unused slot per the panel's zone configuration
+                if (zone.zone_source or "").lower() == "disabled":
+                    continue
                 key = (device_id, idx)
                 if key in known_zones:
                     continue
@@ -191,6 +194,13 @@ class CoveAlulaZoneSensor(_BasePanelEntity):
         super().__init__(coordinator, device_id)
         self._index = index
         self._attr_unique_id = f"{entry.entry_id}_{device_id}_zone_{index}"
+
+    @property
+    def available(self) -> bool:
+        z = self._zone
+        if z is not None and (z.zone_source or "").lower() == "disabled":
+            return False
+        return super().available
 
     @property
     def _zone(self) -> Zone | None:
