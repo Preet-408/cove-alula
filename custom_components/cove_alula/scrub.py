@@ -39,3 +39,25 @@ def scrub(obj: Any, depth: int = 0) -> Any:
     if isinstance(obj, (bool, int, float)) or obj is None:
         return obj
     return str(obj)[:40]
+
+
+def capture_zone_entries(data: Any, index_keys: tuple[str, ...]) -> dict[str, Any]:
+    """Per-zone config entries keyed by index, scrubbed BEFORE unwrapping "value"."""
+    if isinstance(data, dict):
+        pairs = list(data.items())
+    elif isinstance(data, list):
+        pairs = list(enumerate(data))
+    else:
+        return {}
+    out: dict[str, Any] = {}
+    for key, entry in pairs[:128]:
+        if not isinstance(entry, dict):
+            continue
+        idx = next((entry[k] for k in index_keys if k in entry), key)
+        clean = scrub(entry)
+        if not isinstance(clean, dict):
+            continue  # the whole record named a sensitive field
+        value = clean.get("value", clean)
+        if isinstance(value, dict):
+            out[str(idx)] = value
+    return out

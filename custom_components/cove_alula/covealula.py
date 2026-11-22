@@ -27,7 +27,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Optional
 
-from .scrub import scrub
+from .scrub import capture_zone_entries
 
 import aiohttp
 
@@ -889,21 +889,10 @@ class CoveAlulaClient:
                 zattrs["name"] = value
 
     def _keep_raw_zone_config(self, nm: str, data: Any) -> None:
-        """Store zone config entries by index for diagnostics, scrubbed of names/PINs."""
-        if isinstance(data, dict):
-            pairs = list(data.items())
-        elif isinstance(data, list):
-            pairs = list(enumerate(data))
-        else:
-            return
-        bucket = self.raw_zone_config.setdefault(nm, {})
-        for key, entry in pairs[:128]:
-            if not isinstance(entry, dict):
-                continue
-            idx = next((entry[k] for k in self._ZONE_INDEX_KEYS if k in entry), key)
-            value = entry.get("value", entry)
-            if isinstance(value, dict):
-                bucket[str(idx)] = scrub(value) or {}
+        """Store scrubbed zone config entries by index for diagnostics."""
+        self.raw_zone_config.setdefault(nm, {}).update(
+            capture_zone_entries(data, self._ZONE_INDEX_KEYS)
+        )
 
     def _extract_mfd_entry(self, entry: dict, attrs: dict, zones: dict) -> None:
         """Handle one payload entry {"name": <field>, "value"/"items": ...}."""
